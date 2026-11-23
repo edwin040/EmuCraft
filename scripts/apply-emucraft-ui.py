@@ -288,7 +288,7 @@ home = home_path.read_text()
 home_marker = "            val compact = maxWidth < 600.dp"
 assert home_marker in home
 if "EmuCraftMascotOverlay()" not in home:
-    home = home.replace(home_marker, home_marker + "\\n            Box(Modifier.align(Alignment.BottomEnd)) { EmuCraftMascotOverlay() }", 1)
+    home = home.replace(home_marker, home_marker + "\n            Box(Modifier.align(Alignment.BottomEnd)) { EmuCraftMascotOverlay() }", 1)
 home_path.write_text(home)
 
 theme_path.write_text(theme)
