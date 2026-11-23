@@ -380,4 +380,107 @@ home_path.write_text(home)
 
 theme_path.write_text(theme)
 app_path.write_text(app)
-print("Applied EmuCraft animated Anime/Donghua backgrounds, optional ambient soundtrack, and removed mascot overlay.")
+
+# Connect EmuCraft performance profiles to the actual PCSX2 Settings model.
+# The upstream Settings.applyTo() writes these values through NativeApp.setSetting()
+# and ConfigStore/InGameOverlay persist them globally or per game.
+profiles_path = root / "java/com/armsx2/config/EmuCraftPerformanceProfiles.kt"
+profiles_path.write_text("""package com.armsx2.config
+
+import android.content.Context
+import com.armsx2.DeviceTier
+
+/** Presets modify the real PCSX2 Settings model; Settings.applyTo() commits them to emucore. */
+object EmuCraftPerformanceProfiles {
+    const val FPS_MAX = 0
+    const val GRAPHICS_MAX = 1
+    const val DEVICE_PERFORMANCE = 2
+    const val MANUAL = 3
+
+    fun apply(profile: Int, base: Settings, context: Context): Settings = when (profile) {
+        FPS_MAX -> base.copy(
+            cpu = base.cpu.copy(
+                eeCycleRate = 0, eeCycleSkip = 1,
+                mtvu = DeviceTier.mtvuDefault(), fastCDVD = true,
+                vu1Instant = true, vuFlagHack = true, intcStat = true, waitLoop = true,
+            ),
+            output = base.output.copy(upscaleFloat = 1.0f),
+            graphics = base.graphics.copy(
+                accurateBlendingUnit = 0, hwMipmap = false, texturePreloading = 1,
+            ),
+            display = base.display.copy(hwRov = false),
+        )
+        GRAPHICS_MAX -> base.copy(
+            cpu = base.cpu.copy(eeCycleRate = 0, eeCycleSkip = 0, fastCDVD = false),
+            output = base.output.copy(upscaleFloat = 2.0f),
+            graphics = base.graphics.copy(
+                accurateBlendingUnit = 2, hwMipmap = true, texturePreloading = 2,
+                fxaa = true,
+            ),
+        )
+        DEVICE_PERFORMANCE -> if (DeviceTier.isLowEnd(context)) {
+            Settings.lowEndPreset(base, DeviceTier.mtvuDefault())
+        } else {
+            base.copy(
+                cpu = base.cpu.copy(eeCycleRate = 0, eeCycleSkip = 0, mtvu = DeviceTier.mtvuDefault()),
+                output = base.output.copy(upscaleFloat = 1.5f),
+                graphics = base.graphics.copy(
+                    accurateBlendingUnit = 1, hwMipmap = true, texturePreloading = 2,
+                ),
+            )
+        }
+        else -> base // Manual is intentionally non-destructive.
+    }
+
+    /** Detect only exact, known presets. Any user-tuned combination is Manual. */
+    fun detect(settings: Settings, context: Context): Int {
+        if (matches(settings, FPS_MAX, context)) return FPS_MAX
+        if (matches(settings, GRAPHICS_MAX, context)) return GRAPHICS_MAX
+        if (matches(settings, DEVICE_PERFORMANCE, context)) return DEVICE_PERFORMANCE
+        return MANUAL
+    }
+
+    private fun matches(settings: Settings, profile: Int, context: Context): Boolean {
+        val expected = apply(profile, Settings(), context)
+        return settings.cpu.eeCycleRate == expected.cpu.eeCycleRate &&
+            settings.cpu.eeCycleSkip == expected.cpu.eeCycleSkip &&
+            settings.cpu.mtvu == expected.cpu.mtvu &&
+            settings.cpu.fastCDVD == expected.cpu.fastCDVD &&
+            settings.output.upscaleFloat == expected.output.upscaleFloat &&
+            settings.graphics.accurateBlendingUnit == expected.graphics.accurateBlendingUnit &&
+            settings.graphics.hwMipmap == expected.graphics.hwMipmap &&
+            settings.graphics.texturePreloading == expected.graphics.texturePreloading &&
+            (profile != GRAPHICS_MAX || settings.graphics.fxaa == expected.graphics.fxaa)
+    }
+}
+""")
+
+performance_path = root / "java/com/armsx2/ui/settings/PerformanceTab.kt"
+performance = performance_path.read_text()
+profile_marker = "        // Speedhack profile presets. Equality against s.copy(...) means the"
+assert profile_marker in performance
+profile_ui = """
+        // EmuCraft profiles write real CPU/GS settings through the same scoped save path.
+        run {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val selected = com.armsx2.config.EmuCraftPerformanceProfiles.detect(s, context)
+            SegmentedRow(
+                label = "EmuCraft performance profile",
+                options = listOf("FPS Max", "Graphics Max", "Device Performance", "Normal / Manual"),
+                selectedIndex = selected,
+                description = "Changes supported PCSX2 CPU and graphics settings. Manual keeps your current values.",
+                onChange = { profile ->
+                    if (profile != com.armsx2.config.EmuCraftPerformanceProfiles.MANUAL) {
+                        apply(com.armsx2.config.EmuCraftPerformanceProfiles.apply(profile, s, context))
+                    }
+                },
+                field = "emucraftPerformanceProfile",
+            )
+        }
+        HelpText("Profiles are applied to the active Global/Game settings scope. Manual does not overwrite custom values.")
+        SettingsDivider()
+"""
+performance = performance.replace(profile_marker, profile_ui + profile_marker, 1)
+performance_path.write_text(performance)
+
+print("Applied EmuCraft animated Anime/Donghua backgrounds, performance profiles, optional ambient soundtrack, and removed mascot overlay.")
