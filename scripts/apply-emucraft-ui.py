@@ -282,6 +282,41 @@ fun EmuCraftAnimatedBackground(modifier: Modifier = Modifier) {
             drawCircle(if (i % 3 == 0) secondary.copy(alpha = pulse * 0.62f) else accent.copy(alpha = pulse * 0.72f),
                 radius, Offset(x, y))
         }
+
+        // Original EmuCraft character silhouette on the right: keeps the left side
+        // calm for library cards while giving the 16:9 background a clear focal point.
+        val figureX = w * 0.79f
+        val figureY = h * 0.52f
+        val figureScale = h / 900f
+        val robe = Path().apply {
+            moveTo(figureX - 155f * figureScale, h * 1.03f)
+            cubicTo(figureX - 190f * figureScale, h * 0.78f, figureX - 125f * figureScale, h * 0.67f, figureX - 62f * figureScale, figureY + 75f * figureScale)
+            cubicTo(figureX - 10f * figureScale, figureY + 28f * figureScale, figureX + 90f * figureScale, figureY + 45f * figureScale, figureX + 145f * figureScale, h * 1.03f)
+            close()
+        }
+        drawPath(robe, if (light) Color(0xCC202A48) else Color(0xD9080B1C))
+        val hair = Path().apply {
+            moveTo(figureX - 43f * figureScale, figureY - 93f * figureScale)
+            cubicTo(figureX - 115f * figureScale, figureY - 160f * figureScale, figureX - 155f * figureScale, figureY - 60f * figureScale, figureX - 116f * figureScale, figureY + 40f * figureScale)
+            cubicTo(figureX - 165f * figureScale, figureY + 5f * figureScale, figureX - 155f * figureScale, figureY + 150f * figureScale, figureX - 95f * figureScale, figureY + 175f * figureScale)
+            cubicTo(figureX - 105f * figureScale, figureY + 50f * figureScale, figureX - 48f * figureScale, figureY + 25f * figureScale, figureX + 35f * figureScale, figureY + 40f * figureScale)
+            cubicTo(figureX + 85f * figureScale, figureY - 20f * figureScale, figureX + 25f * figureScale, figureY - 120f * figureScale, figureX - 43f * figureScale, figureY - 93f * figureScale)
+            close()
+        }
+        drawPath(hair, if (donghua) Color(0xFF17120F) else Color(0xFF090B19))
+        drawCircle(if (light) Color(0xFFFFDCC8) else Color(0xFFE9D8D2), 43f * figureScale, Offset(figureX - 12f * figureScale, figureY - 58f * figureScale))
+        // Long flowing hair strands and robe highlights create a subtle parallax-like accent.
+        val strand = Path().apply {
+            moveTo(figureX - 42f * figureScale, figureY - 82f * figureScale)
+            cubicTo(figureX - 170f * figureScale, figureY - 8f * figureScale, figureX - 115f * figureScale, figureY + 150f * figureScale, figureX - 170f * figureScale, h * 0.92f)
+        }
+        drawPath(strand, accent.copy(alpha = 0.72f), style = Stroke(width = 3.2f * figureScale))
+        val robeFold = Path().apply {
+            moveTo(figureX - 70f * figureScale, figureY + 92f * figureScale)
+            cubicTo(figureX - 10f * figureScale, h * 0.82f, figureX + 40f * figureScale, h * 0.88f, figureX + 80f * figureScale, h * 1.02f)
+        }
+        drawPath(robeFold, secondary.copy(alpha = 0.62f), style = Stroke(width = 2.6f * figureScale))
+        drawCircle(accent.copy(alpha = 0.8f), 5f * figureScale, Offset(figureX + 35f * figureScale, figureY + 3f * figureScale))
     }
 }
 """)
