@@ -111,6 +111,15 @@ object EmuCraftUiPreferences {
 }
 """)
 
+# Load EmuCraft choices after the upstream theme and toolbar preferences are restored.
+runtime_path = root / "java/com/armsx2/runtime/MainActivityRuntime.kt"
+runtime = runtime_path.read_text()
+load_marker = "        com.armsx2.ui.theme.LibraryChromePreferences.load()"
+assert load_marker in runtime
+if "EmuCraftUiPreferences.load()" not in runtime:
+    runtime = runtime.replace(load_marker, load_marker + "\\n        com.armsx2.ui.theme.EmuCraftUiPreferences.load()", 1)
+runtime_path.write_text(runtime)
+
 # Add a dedicated EmuCraft appearance panel in the existing App settings.
 insert_marker = "        // Library background (wave) color."
 assert insert_marker in app
