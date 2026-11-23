@@ -250,7 +250,6 @@ fun EmuCraftMascotOverlay() {
         Canvas(
             Modifier.size(66.dp).shadow(5.dp, CircleShape).clickable {
                 donghua = !donghua
-                EmuCraftUiPreferences.setMascot(if (donghua) "Donghua" else "Anime")
             }
         ) {
             val cx = size.width / 2f
