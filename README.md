@@ -10,13 +10,17 @@ Android-first, PS2-focused emulator application project.
 
 These are device targets, not a guarantee that every PS2 title will run at full speed.
 
-## Current milestone: Android foundation
+## Current milestone: Android foundation + file management
 - Native Android application shell
 - ARM64 Android NDK / CMake integration
-- Storage Access Framework game-file picker
+- JNI bridge loaded by the Android application
+- Storage Access Framework file selection
+- PS2 game-file registration for ISO, CHD, CSO and BIN extensions
+- BIOS file selection for BIN, ROM and BIOS extensions
+- Persisted document URI references across app restarts (where the document provider supports persistable grants)
 - GitHub Actions debug APK workflow
 
-**This is an application scaffold, not a functioning PS2 emulator.** No PS2 emulation core is integrated yet. Selecting an ISO does not start a game.
+**This is not yet a functioning PS2 emulator.** The current app registers file references only. It does not parse disc images, validate BIOS contents, boot games, or emulate PS2 hardware.
 
 ## Planned architecture
 - Kotlin Android application and lifecycle
@@ -26,7 +30,7 @@ These are device targets, not a guarantee that every PS2 title will run at full 
 - Low-latency audio, controller input, memory cards and save states
 
 ## BIOS and game files
-The project will not bundle copyrighted PS2 BIOS firmware or commercial game images. Users must provide files they are legally entitled to use. BIOS configuration will be implemented in a later milestone.
+The project will not bundle copyrighted PS2 BIOS firmware or commercial game images. Users must provide files they are legally entitled to use. Current extension checks are only preliminary file selection checks; actual format and BIOS validation must be implemented by the emulation core.
 
 ## Build
 Requirements: JDK 17, Android SDK platform 35, NDK 27.2.12479018, CMake 3.22.1 and Gradle 8.9.
