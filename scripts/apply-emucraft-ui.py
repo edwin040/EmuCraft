@@ -188,6 +188,110 @@ panel = """
 
 """
 app = app.replace(insert_marker, panel + insert_marker, 1)
+
+# Keep EmuCraft-specific theme presets in the dedicated appearance panel instead of
+# duplicating them in the upstream generic color-theme picker.
+app = app.replace(
+    "ThemeMode.entries.filter {",
+    "ThemeMode.entries.filter { it !in listOf(ThemeMode.AnimeDark, ThemeMode.AnimeLight, ThemeMode.DonghuaDark, ThemeMode.DonghuaLight) }.filter {",
+    1,
+)
+
+# Animated, touch-reactive vector chibi mascot. It is drawn in Compose so it needs no
+# downloaded artwork, does not bundle third-party character IP, and stays lightweight.
+mascot_path = root / "java/com/armsx2/ui/home/EmuCraftMascot.kt"
+mascot_path.write_text("""package com.armsx2.ui.home
+
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.dp
+import com.armsx2.ui.theme.EmuCraftUiPreferences
+
+@Composable
+fun EmuCraftMascotOverlay() {
+    if (EmuCraftUiPreferences.mascot.value == "Off") return
+    var donghua by remember { mutableStateOf(EmuCraftUiPreferences.character.value == "Donghua") }
+    val motion = rememberInfiniteTransition(label = "emucraftMascot")
+    val bob by motion.animateFloat(
+        initialValue = -3f, targetValue = 3f,
+        animationSpec = infiniteRepeatable(tween(1500, easing = LinearEasing), RepeatMode.Reverse),
+        label = "bob",
+    )
+    val blink by motion.animateFloat(
+        initialValue = 1f, targetValue = 0.12f,
+        animationSpec = infiniteRepeatable(tween(120, delayMillis = 2600), RepeatMode.Reverse),
+        label = "blink",
+    )
+    val animeAccent = Color(0xFFB58AFF)
+    val donghuaAccent = Color(0xFFFFC56B)
+    val accent = if (donghua) donghuaAccent else animeAccent
+    Box(Modifier.padding(12.dp), contentAlignment = Alignment.Center) {
+        Canvas(
+            Modifier.size(66.dp).shadow(5.dp, CircleShape).clickable {
+                donghua = !donghua
+                EmuCraftUiPreferences.setMascot(if (donghua) "Donghua" else "Anime")
+            }
+        ) {
+            val cx = size.width / 2f
+            val cy = size.height / 2f + bob
+            val head = size.minDimension * 0.34f
+            drawCircle(Color(0xCC171522), radius = head * 1.28f, center = androidx.compose.ui.geometry.Offset(cx, cy))
+            // Hair silhouette / topknot
+            drawCircle(if (donghua) Color(0xFF34251B) else Color(0xFF29213D),
+                radius = head * 1.12f, center = androidx.compose.ui.geometry.Offset(cx, cy - head * 0.12f))
+            drawCircle(Color(0xFFFFDCCB), radius = head * 0.88f,
+                center = androidx.compose.ui.geometry.Offset(cx, cy + head * 0.12f))
+            // Fringe
+            val fringe = androidx.compose.ui.graphics.Path().apply {
+                moveTo(cx - head * 0.9f, cy - head * 0.15f)
+                quadraticTo(cx - head * 0.25f, cy - head * 1.3f, cx + head * 0.05f, cy - head * 0.48f)
+                quadraticTo(cx + head * 0.7f, cy - head * 1.05f, cx + head * 0.9f, cy - head * 0.05f)
+                close()
+            }
+            drawPath(fringe, if (donghua) Color(0xFF34251B) else Color(0xFF29213D))
+            val eyeY = cy + head * 0.18f
+            drawCircle(Color(0xFF35243B), head * 0.09f,
+                androidx.compose.ui.geometry.Offset(cx - head * 0.34f, eyeY), alpha = blink)
+            drawCircle(Color(0xFF35243B), head * 0.09f,
+                androidx.compose.ui.geometry.Offset(cx + head * 0.34f, eyeY), alpha = blink)
+            drawCircle(accent, head * 0.12f, androidx.compose.ui.geometry.Offset(cx, cy + head * 1.12f))
+            drawCircle(accent, head * 1.26f, androidx.compose.ui.geometry.Offset(cx, cy),
+                style = Stroke(width = 2.dp.toPx()))
+        }
+    }
+}
+""")
+
+# Overlay the mascot on the game library without intercepting the rest of the screen.
+home_path = root / "java/com/armsx2/ui/home/HomeScreen.kt"
+home = home_path.read_text()
+home_marker = "            val compact = maxWidth < 600.dp"
+assert home_marker in home
+if "EmuCraftMascotOverlay()" not in home:
+    home = home.replace(home_marker, home_marker + "\\n            Box(Modifier.align(Alignment.BottomEnd)) { EmuCraftMascotOverlay() }", 1)
+home_path.write_text(home)
+
 theme_path.write_text(theme)
 app_path.write_text(app)
 print("Applied EmuCraft theme palettes and appearance controls.")
