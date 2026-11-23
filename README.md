@@ -1,68 +1,56 @@
 # EmuCraft
 
-Android-first, PS2-focused emulator application project.
+EmuCraft is an Android-first PS2 emulator project. The Android application now uses the existing **ARMSX2 Android application and PCSX2-derived emulation core as its foundation**, rather than maintaining a separate placeholder shell.
 
-## Target devices
-- Android 8.0 (API 26) and newer
-- ARM64-v8a
-- Baseline test target: Snapdragon 720G-class devices
-- Additional targets: Snapdragon 778G / 7-series and MediaTek Dimensity 7200-class or better
+## Current implementation direction
 
-These are device targets, not a guarantee that every PS2 title will run at full speed.
+- Upstream base: [ARMSX2](https://github.com/ARMSX2/ARMSX2)
+- Pinned upstream revision: `a2914992c8c507d4c196464dbcf773fc7b0d0def`
+- Android application and native ARM64 emulation core are built from that pinned source.
+- CI overrides the Android application ID to `com.emucraft.ps2` and launcher label to `EmuCraft`.
+- ABI target: `arm64-v8a`
+- Minimum Android version from the upstream base: Android 8.0 (API 26).
+- BIOS and game images must be supplied by the user; EmuCraft will not bundle copyrighted firmware or commercial game images.
 
-## Current milestone: Android foundation + private file staging
-- Native Android application shell
-- ARM64 Android NDK / CMake integration
-- JNI bridge loaded by the Android application
-- Storage Access Framework game and BIOS selection
-- Supported preliminary game extensions: ISO, CHD, CSO and BIN
-- Supported preliminary BIOS extensions: BIN, ROM and BIOS
-- Selected files are copied as streams into app-private storage (no full-file RAM buffering)
-- SHA-256 digest is calculated during import
-- Temporary files are finalized only after a successful, non-empty copy
-- Private file paths and original SAF URI references are persisted across app restarts
-- GitHub Actions debug APK workflow
+The initial CI build uses the upstream GitHub flavor. It is a first integrated EmuCraft-branded build, not yet a fully rebranded product. Some internal screens, About text, assets, and upstream identifiers may still display ARMSX2 and will be reviewed and customized in subsequent milestones.
 
-**This is not yet a functioning PS2 emulator.** The current app can stage user-selected files and expose their private filesystem paths to future native integration. It does not parse disc images, validate BIOS contents, boot games, or emulate PS2 hardware.
+## Device targets
 
-## PS2 core evaluation
+The intended compatibility targets are:
+- Baseline testing: Snapdragon 720G-class devices.
+- Additional targets: Snapdragon 778G / 7-series and MediaTek Dimensity 7200-class or better.
+- Both Adreno and Mali GPUs are in scope, subject to renderer and driver compatibility.
 
-ARMSX2 is the leading integration candidate because its upstream repository contains a dedicated Android application and an ARM64 PCSX2-derived core. The upstream Android guide documents an Android Gradle build (:app:assembleGithubDebug), and its Android CMake entry point wires the shared PCSX2 core into an Android JNI library.
-
-However, the upstream Android CMake entry point currently contains an explicit warning that its wiring has **not yet been compiled against a real Android NDK**. Its Android toolchain also differs materially from this app (upstream currently specifies Gradle 9.4.1, AGP 9.2.1, compile SDK 37, NDK 29 and CMake 3.31.6; this project uses Gradle 8.9, AGP 8.7.3, SDK 35, NDK 27.2.12479018 and CMake 3.22.1). Therefore, copying its native build files or changing tool versions blindly would be unsafe.
-
-Evaluation snapshot:
-- Upstream: https://github.com/ARMSX2/ARMSX2
-- Branch inspected: master
-- Commit inspected: a2914992c8c507d4c196464dbcf773fc7b0d0def
-- License: GPL-3.0; distribution must preserve the license and satisfy corresponding-source obligations if this core is incorporated.
-- Decision: candidate accepted for a controlled Android build experiment, not yet vendored or linked into EmuCraft.
-
-Integration gate before shipping the core:
-1. Pin and fetch a reviewed upstream commit, including all required submodules and third-party sources.
-2. Build the upstream Android native target in a separate CI job with its documented toolchain.
-3. Verify the resulting ARM64 libraries and 16 KB page-size compatibility.
-4. Add a narrow JNI adapter and smoke-test core initialization/shutdown before wiring game boot.
-5. Review GPL-3.0 and all bundled third-party licenses before distribution.
-
-## Planned architecture
-- Kotlin Android application and lifecycle
-- C++ native layer via Android NDK
-- PS2 core integration after Android-port feasibility, license and distribution review
-- Vulkan renderer with capability-based OpenGL ES fallback
-- Low-latency audio, controller input, memory cards and save states
-
-## BIOS and game files
-The project will not bundle copyrighted PS2 BIOS firmware or commercial game images. Users must provide files they are legally entitled to use. Extension checks are only preliminary selection checks; actual disc format and BIOS validation must be implemented by the emulation core.
-
-Imported files live in the app's private storage under files/emucraft/imports. They are removed if the app's private data is cleared or the app is uninstalled. A future library-management feature should provide explicit removal and re-import controls.
+These are testing targets, not a guarantee that every PS2 title will run at full speed. Actual performance must be measured on physical devices and per game.
 
 ## Build
-Requirements: JDK 17, Android SDK platform 35, NDK 27.2.12479018, CMake 3.22.1 and Gradle 8.9.
 
-    gradle assembleDebug
+GitHub Actions builds the pinned upstream Android project using:
+- JDK 17
+- Android SDK API 36 for the current CI runner
+- Android NDK 29.0.14206865
+- CMake 3.31.6
+- ARM64-v8a
 
-APK output: app/build/outputs/apk/debug/app-debug.apk.
+The upstream revision declares API 37; the CI workflow currently adapts compile/target SDK to API 36 and uses compatible AndroidX dependency versions because API 37 is not available in the runner's configured SDK repository. These CI-only adaptations are applied to the checkout and do not rewrite the upstream repository.
 
-## Licensing
-Third-party emulator components and their licenses must be reviewed and documented before distribution.
+To build locally, first clone the pinned ARMSX2 source with its submodules, then follow its Android build documentation. The EmuCraft workflow in `.github/workflows/android-build.yml` is the current reproducible build recipe.
+
+## Licensing and source
+
+The integrated emulator base is licensed under **GNU GPL version 3**. See [COPYING.GPLv3](COPYING.GPLv3) and the upstream source repository. Changes and distribution of binaries must comply with GPL-3.0, including providing the corresponding source and preserving applicable notices and third-party license terms.
+
+- Upstream source: https://github.com/ARMSX2/ARMSX2
+- Pinned source commit: https://github.com/ARMSX2/ARMSX2/commit/a2914992c8c507d4c196464dbcf773fc7b0d0def
+- This repository contains the EmuCraft build configuration and project-specific modifications. The pinned upstream source is checked out by CI at build time.
+
+## Next milestones
+
+1. Verify the integrated APK installs and launches on real ARM64 Android devices.
+2. Replace remaining upstream branding and review the full user-facing flow as EmuCraft.
+3. Verify BIOS selection, game library scanning, and game boot with legally supplied files.
+4. Test Vulkan/OpenGL renderer selection, audio, touch controls, and external controllers.
+5. Run compatibility and performance tests on Snapdragon and MediaTek devices.
+6. Review all upstream and third-party licenses before public distribution.
+
+**Build success alone does not prove that a game boots correctly.** Real-device testing with a user-provided BIOS and game image is still required.
