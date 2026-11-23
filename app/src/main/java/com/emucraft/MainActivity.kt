@@ -161,7 +161,7 @@ class MainActivity : Activity() {
 
         importExecutor.execute {
             try {
-                val imported = GameFileImporter.import(
+                val imported = GameFileImporter.importFile(
                     resolver = contentResolver,
                     uri = uri,
                     displayName = name,
