@@ -276,7 +276,7 @@ fun EmuCraftAnimatedBackground(modifier: Modifier = Modifier) {
             val seed = i * 0.6180339f
             val x = ((seed + drift * (0.08f + (i % 5) * 0.025f)) % 1f) * w
             val y = (((i * 0.173f) + drift * (if (i % 2 == 0) 0.13f else -0.09f) + 1f) % 1f) * h
-            val pulse = (0.35f + 0.65f * sin((shimmer * 2f * PI.toFloat()) + i).let { (it + 1f) / 2f })
+            val pulse = (0.35f + 0.65f * sin((shimmer * 2f * PI.toFloat()) + i).toFloat().let { (it + 1f) / 2f })
             val radius = (1.1f + (i % 4) * 0.55f) * density
             drawCircle(if (i % 3 == 0) secondary.copy(alpha = pulse * 0.62f) else accent.copy(alpha = pulse * 0.72f),
                 radius, Offset(x, y))
