@@ -4,6 +4,16 @@ import struct
 import wave
 
 root = Path("upstream/ARMSX2/platforms/android/app/src/main")
+
+# Optional user-provided Donghua artwork is stored in the repository at assets/donghua-bg.webp.
+# Copy it into Android drawable resources when present; the build remains valid without it.
+asset_source = Path("assets/donghua-bg.webp")
+if asset_source.exists():
+    asset_target = Path("upstream/ARMSX2/platforms/android/app/src/main/res/drawable-nodpi/emucraft_donghua_bg.webp")
+    asset_target.parent.mkdir(parents=True, exist_ok=True)
+    asset_target.write_bytes(asset_source.read_bytes())
+
+
 theme_path = root / "java/com/armsx2/ui/theme/Theme.kt"
 app_path = root / "java/com/armsx2/ui/settings/AppTab.kt"
 theme = theme_path.read_text()
@@ -215,6 +225,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -248,7 +261,7 @@ fun EmuCraftAnimatedBackground(modifier: Modifier = Modifier) {
         val upper = if (light) {
             if (donghua) Color(0xFF6F5033) else Color(0xFF343C70)
         } else mid
-        drawRect(Brush.verticalGradient(listOf(upper.copy(alpha = 0.88f), base.copy(alpha = 0.94f), deep.copy(alpha = 0.98f))))
+        drawRect(Brush.verticalGradient(listOf(upper.copy(alpha = if (donghuaArtwork != null) 0.10f else 0.88f), base.copy(alpha = if (donghuaArtwork != null) 0.14f else 0.94f), deep.copy(alpha = if (donghuaArtwork != null) 0.20f else 0.98f))))
 
         // Broad atmospheric glow, deliberately low contrast behind game covers and labels.
         drawCircle(
