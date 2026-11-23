@@ -46,13 +46,20 @@ jobs:
           yes | sdkmanager --licenses
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.14206865" "cmake;3.31.6"
 
-      - name: Adapt probe compile/target SDK to installed API 36
+      - name: Adapt probe to API 36-compatible AndroidX dependencies
         working-directory: upstream/ARMSX2
         run: |
+          # API 37 is not available from the runner SDK repository yet. Keep the
+          # upstream app's minSdk and ARM64 target, but use the latest dependency
+          # lines that do not declare compileSdk 37 as their minimum.
           sed -i 's/compileSdk = 37/compileSdk = 36/' platforms/android/app/build.gradle.kts
           sed -i 's/targetSdk = 37/targetSdk = 36/' platforms/android/app/build.gradle.kts
+          sed -i 's/coreKtx = "1.19.0"/coreKtx = "1.18.0"/' platforms/android/gradle/libs.versions.toml
+          sed -i 's/lifecycle = "2.11.0"/lifecycle = "2.10.0"/' platforms/android/gradle/libs.versions.toml
           grep -q 'compileSdk = 36' platforms/android/app/build.gradle.kts
           grep -q 'targetSdk = 36' platforms/android/app/build.gradle.kts
+          grep -q 'coreKtx = "1.18.0"' platforms/android/gradle/libs.versions.toml
+          grep -q 'lifecycle = "2.10.0"' platforms/android/gradle/libs.versions.toml
           grep -q 'ndkVersion.*29.0.14206865' platforms/android/app/build.gradle.kts
 
       - name: Fetch shaderc third-party dependencies
