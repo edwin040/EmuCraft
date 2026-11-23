@@ -22,7 +22,7 @@ object GameFileImporter {
     )
 
     @Throws(IOException::class)
-    fun import(
+    fun importFile(
         resolver: ContentResolver,
         uri: Uri,
         displayName: String,
@@ -73,7 +73,7 @@ object GameFileImporter {
                 throw IOException("The selected file is empty.")
             }
 
-            val hash = digest.digest().joinToString("") { "%02x".format(Locale.ROOT, it) }
+            val hash = digest.digest().joinToString("") { "%02x".format(Locale.ROOT, it.toInt() and 0xff) }
             val finalFile = File(importDirectory, "${kind}_${hash.take(16)}_${safeName}")
 
             if (finalFile.exists()) {
