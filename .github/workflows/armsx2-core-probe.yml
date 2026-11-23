@@ -1,6 +1,10 @@
 name: ARMSX2 Android Core Probe
 
 on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/armsx2-core-probe.yml'
   workflow_dispatch:
 
 permissions:
