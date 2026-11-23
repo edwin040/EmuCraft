@@ -1,4 +1,7 @@
 from pathlib import Path
+import math
+import struct
+import wave
 
 root = Path("upstream/ARMSX2/platforms/android/app/src/main")
 theme_path = root / "java/com/armsx2/ui/theme/Theme.kt"
@@ -61,13 +64,16 @@ import com.armsx2.runtime.MainActivityRuntime
 object EmuCraftUiPreferences {
     private const val ModeKey = "emucraft.ui.mode"
     private const val CharacterKey = "emucraft.ui.character"
+    private const val AmbientKey = "emucraft.ui.ambient"
 
     val mode = mutableStateOf("Modern")
     val character = mutableStateOf("Anime")
+    val ambientEnabled = mutableStateOf(false)
 
     fun load() {
         mode.value = MainActivityRuntime.prefs.getString(ModeKey, "Modern") ?: "Modern"
         character.value = MainActivityRuntime.prefs.getString(CharacterKey, "Anime") ?: "Anime"
+        ambientEnabled.value = MainActivityRuntime.prefs.getBoolean(AmbientKey, false)
         ToolbarPositionPreferences.set(mode.value == "Console")
         val light = ThemePreferences.mode.value in listOf(ThemeMode.Light, ThemeMode.AnimeLight, ThemeMode.DonghuaLight)
         ThemePreferences.set(
@@ -97,6 +103,11 @@ object EmuCraftUiPreferences {
                 ThemePreferences.mode.value == ThemeMode.Light) ThemeMode.AnimeLight else ThemeMode.AnimeDark
         }
         ThemePreferences.set(target)
+    }
+
+    fun setAmbientEnabled(value: Boolean) {
+        ambientEnabled.value = value
+        MainActivityRuntime.prefs.edit { putBoolean(AmbientKey, value) }
     }
 
     fun setColorMode(light: Boolean) {
@@ -165,6 +176,13 @@ panel = """
                     onClick = { com.armsx2.ui.theme.EmuCraftUiPreferences.setColorMode(true) },
                     label = { Text("Light") })
             }
+            Spacer(Modifier.height(8.dp))
+            Text("Ambient soundtrack", style = MaterialTheme.typography.labelLarge)
+            FilterChip(
+                selected = com.armsx2.ui.theme.EmuCraftUiPreferences.ambientEnabled.value,
+                onClick = { com.armsx2.ui.theme.EmuCraftUiPreferences.setAmbientEnabled(!com.armsx2.ui.theme.EmuCraftUiPreferences.ambientEnabled.value) },
+                label = { Text(if (com.armsx2.ui.theme.EmuCraftUiPreferences.ambientEnabled.value) "Sound On" else "Sound Off") },
+            )
         }
 
 """
@@ -178,10 +196,186 @@ app = app.replace(
     1,
 )
 
+
+# Animated Anime/Donghua atmosphere: full-screen color field, moving curved light ribbons,
+# drifting spark fragments, and restrained glow. The native backdrop remains underneath.
+visual_path = root / "java/com/armsx2/ui/home/EmuCraftAnimatedBackground.kt"
+visual_path.write_text("""package com.armsx2.ui.home
+
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import com.armsx2.ui.theme.EmuCraftUiPreferences
+import com.armsx2.ui.theme.ThemeMode
+import com.armsx2.ui.theme.ThemePreferences
+import kotlin.math.PI
+import kotlin.math.sin
+
+@Composable
+fun EmuCraftAnimatedBackground(modifier: Modifier = Modifier) {
+    val donghua = EmuCraftUiPreferences.character.value == "Donghua"
+    val light = ThemePreferences.mode.value in listOf(ThemeMode.AnimeLight, ThemeMode.DonghuaLight)
+    val deep = if (donghua) Color(0xFF21170E) else Color(0xFF15132A)
+    val mid = if (donghua) Color(0xFF573A20) else Color(0xFF30245C)
+    val accent = if (donghua) Color(0xFFFFC66E) else Color(0xFF9C83FF)
+    val secondary = if (donghua) Color(0xFFE99A45) else Color(0xFF4CA7FF)
+    val transition = rememberInfiniteTransition(label = "emucraftAtmosphere")
+    val drift by transition.animateFloat(0f, 1f,
+        infiniteRepeatable(tween(18000, easing = LinearEasing), RepeatMode.Restart), label = "drift")
+    val shimmer by transition.animateFloat(0f, 1f,
+        infiniteRepeatable(tween(7200, easing = LinearEasing), RepeatMode.Restart), label = "shimmer")
+
+    Canvas(modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        val base = if (light) {
+            if (donghua) Color(0xFFB58A57) else Color(0xFF6678A8)
+        } else deep
+        val upper = if (light) {
+            if (donghua) Color(0xFF6F5033) else Color(0xFF343C70)
+        } else mid
+        drawRect(Brush.verticalGradient(listOf(upper.copy(alpha = 0.88f), base.copy(alpha = 0.94f), deep.copy(alpha = 0.98f))))
+
+        // Broad atmospheric glow, deliberately low contrast behind game covers and labels.
+        drawCircle(
+            Brush.radialGradient(listOf(accent.copy(alpha = if (light) 0.12f else 0.19f), Color.Transparent),
+                center = Offset(w * (0.22f + drift * 0.56f), h * 0.34f), radius = w * 0.72f),
+            radius = w * 0.72f, center = Offset(w * (0.22f + drift * 0.56f), h * 0.34f)
+        )
+
+        // Two elegant curved ribbons, travelling slowly across the scene.
+        for (i in 0..2) {
+            val phase = (drift + i * 0.31f) % 1f
+            val path = Path().apply {
+                moveTo(-w * 0.12f, h * (0.30f + i * 0.16f))
+                cubicTo(w * (0.18f + phase * 0.22f), h * (0.02f + i * 0.12f),
+                    w * (0.58f - phase * 0.12f), h * (0.82f - i * 0.10f),
+                    w * 1.12f, h * (0.38f + i * 0.14f))
+            }
+            drawPath(path, accent.copy(alpha = (if (light) 0.15f else 0.27f) - i * 0.045f),
+                style = Stroke(width = (2.4f - i * 0.45f).dp.toPx()))
+            drawPath(path, Brush.linearGradient(listOf(Color.Transparent, secondary.copy(alpha = 0.26f), Color.Transparent)),
+                style = Stroke(width = (8f - i).dp.toPx()))
+        }
+
+        // Deterministic drifting sparks; their positions animate without allocating particle objects.
+        for (i in 0 until 34) {
+            val seed = i * 0.6180339f
+            val x = ((seed + drift * (0.08f + (i % 5) * 0.025f)) % 1f) * w
+            val y = (((i * 0.173f) + drift * (if (i % 2 == 0) 0.13f else -0.09f) + 1f) % 1f) * h
+            val pulse = (0.35f + 0.65f * sin((shimmer * 2f * PI.toFloat()) + i).let { (it + 1f) / 2f })
+            val radius = (1.1f + (i % 4) * 0.55f) * density
+            drawCircle(if (i % 3 == 0) secondary.copy(alpha = pulse * 0.62f) else accent.copy(alpha = pulse * 0.72f),
+                radius, Offset(x, y))
+        }
+    }
+}
+""")
+
+audio_path = root / "java/com/armsx2/ui/home/EmuCraftAmbientAudio.kt"
+audio_path.write_text("""package com.armsx2.ui.home
+
+import android.content.Context
+import android.media.MediaPlayer
+import com.armsx2.R
+
+/** Original, locally bundled ambient loop. No network, ads, or third-party music service. */
+object EmuCraftAmbientAudio {
+    private var player: MediaPlayer? = null
+
+    @Synchronized fun start(context: Context) {
+        if (player?.isPlaying == true) return
+        stop()
+        player = MediaPlayer.create(context.applicationContext, R.raw.emucraft_ambient)?.apply {
+            isLooping = true
+            setVolume(0.22f, 0.22f)
+            start()
+        }
+    }
+
+    @Synchronized fun stop() {
+        runCatching { player?.stop() }
+        runCatching { player?.release() }
+        player = null
+    }
+}
+""")
+
+# Generate a gentle original ambient pad loop at build time (no copyrighted soundtrack).
+raw_dir = root / "res/raw"
+raw_dir.mkdir(parents=True, exist_ok=True)
+wav_path = raw_dir / "emucraft_ambient.wav"
+sample_rate = 22050
+duration = 16
+notes = [(130.81, 164.81, 196.00), (110.00, 146.83, 174.61),
+         (123.47, 155.56, 185.00), (98.00, 130.81, 164.81)]
+with wave.open(str(wav_path), "wb") as wav:
+    wav.setnchannels(1)
+    wav.setsampwidth(2)
+    wav.setframerate(sample_rate)
+    frames = bytearray()
+    total = sample_rate * duration
+    for n in range(total):
+        t = n / sample_rate
+        chord = notes[int(t // 4) % len(notes)]
+        fade = min(1.0, t / 1.5, (duration - t) / 1.5)
+        pad = sum(math.sin(2 * math.pi * f * t) * (0.55 if j == 0 else 0.28 if j == 1 else 0.18)
+                  for j, f in enumerate(chord))
+        shimmer_t = t % 4.0
+        bell_freq = chord[1] * (2.0 if shimmer_t < 2.0 else 2.5)
+        bell = math.sin(2 * math.pi * bell_freq * t) * math.exp(-((shimmer_t - 0.4) % 2.0) * 2.8) * 0.10
+        sample = max(-1.0, min(1.0, (pad * 0.055 + bell) * fade))
+        frames.extend(struct.pack("<h", int(sample * 32767)))
+    wav.writeframes(frames)
+
+# The sound follows the user's explicit toggle and is stopped when the library screen leaves.
+home_path = root / "java/com/armsx2/ui/home/HomeScreen.kt"
+home = home_path.read_text()
+audio_anchor = '    val context = LocalContext.current\n'
+if audio_anchor not in home:
+    raise RuntimeError("HomeScreen context anchor missing for ambient audio host")
+home = home.replace(audio_anchor, audio_anchor + """    DisposableEffect(com.armsx2.ui.theme.EmuCraftUiPreferences.ambientEnabled.value) {
+        if (com.armsx2.ui.theme.EmuCraftUiPreferences.ambientEnabled.value) {
+            EmuCraftAmbientAudio.start(context)
+        } else {
+            EmuCraftAmbientAudio.stop()
+        }
+        onDispose { EmuCraftAmbientAudio.stop() }
+    }
+""", 1)
+
+# Add the animated visual layer after the readability scrim, still below library controls.
+visual_anchor = """                )
+            }
+        },
+    ) {
+"""
+if visual_anchor not in home:
+    raise RuntimeError("HomeScreen background-layer insertion anchor missing")
+home = home.replace(visual_anchor, """                )
+                EmuCraftAnimatedBackground(Modifier.fillMaxSize())
+            }
+        },
+    ) {
+""", 1)
+home_path.write_text(home)
+
 # Mascot artwork and overlay are intentionally omitted from EmuCraft UI.
 
 # No floating mascot overlay: keep the game library focused on emulator controls.
 
 theme_path.write_text(theme)
 app_path.write_text(app)
-print("Applied EmuCraft theme palettes and appearance controls; mascot overlay removed.")
+print("Applied EmuCraft animated Anime/Donghua backgrounds, optional ambient soundtrack, and removed mascot overlay.")
