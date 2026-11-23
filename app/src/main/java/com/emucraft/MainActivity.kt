@@ -12,7 +12,9 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import java.io.File
 import java.util.Locale
+import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private lateinit var gameLabel: TextView
@@ -20,6 +22,9 @@ class MainActivity : Activity() {
     private lateinit var engineStatus: TextView
     private var gameUri: Uri? = null
     private var biosUri: Uri? = null
+    private var gameFile: File? = null
+    private var biosFile: File? = null
+    private val importExecutor = Executors.newSingleThreadExecutor()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,6 +34,8 @@ class MainActivity : Activity() {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
         gameUri = prefs.getString(KEY_GAME_URI, null)?.let(Uri::parse)
         biosUri = prefs.getString(KEY_BIOS_URI, null)?.let(Uri::parse)
+        gameFile = prefs.getString(KEY_GAME_PATH, null)?.let(::File)?.takeIf { it.isFile && it.length() > 0L }
+        biosFile = prefs.getString(KEY_BIOS_PATH, null)?.let(::File)?.takeIf { it.isFile && it.length() > 0L }
 
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -70,7 +77,7 @@ class MainActivity : Activity() {
         val note = panel()
         note.addView(label("IMPORTANT", 11, 0xFFFFC56B.toInt(), true))
         note.addView(label(
-            "Game and BIOS selection are now stored on this device. Emulation is still disabled until a compatible PS2 core is integrated and tested.",
+            "Selected files are copied into EmuCraft's private storage so the future native core can read normal file paths. This does not yet validate or run games.",
             13, Color.WHITE, false
         ).apply { setPadding(0, dp(8), 0, 0) })
         content.addView(note)
@@ -79,8 +86,8 @@ class MainActivity : Activity() {
         content.addView(label("DEVELOPMENT ROADMAP", 12, MUTED, true))
         listOf(
             "✓ Android ARM64 build foundation",
-            "✓ Native C++ bridge and file selection",
-            "✓ Persistent game / BIOS file references",
+            "✓ Native C++ bridge and SAF file selection",
+            "✓ Private game / BIOS staging with SHA-256",
             "→ Integrate and compile PS2 core",
             "→ Renderer, audio and controller pipeline",
             "→ Compatibility and performance testing"
@@ -117,13 +124,14 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != RESULT_OK) return
         val uri = data?.data ?: return
+        if (requestCode != REQUEST_GAME && requestCode != REQUEST_BIOS) return
+
         val name = queryDisplayName(uri)
         val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
-
-        val accepted = when (requestCode) {
-            REQUEST_GAME -> extension in GAME_EXTENSIONS
-            REQUEST_BIOS -> extension in BIOS_EXTENSIONS
-            else -> false
+        val accepted = if (requestCode == REQUEST_GAME) {
+            extension in GAME_EXTENSIONS
+        } else {
+            extension in BIOS_EXTENSIONS
         }
         if (!accepted) {
             engineStatus.text = if (requestCode == REQUEST_GAME) {
@@ -135,28 +143,75 @@ class MainActivity : Activity() {
         }
 
         try {
-            val flags = data.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-            contentResolver.takePersistableUriPermission(uri, flags and Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            val readFlag = data.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
+            if (readFlag != 0) contentResolver.takePersistableUriPermission(uri, readFlag)
         } catch (_: SecurityException) {
-            // Some document providers grant only temporary access; selection still remains visible.
+            // Import immediately below while the temporary SAF grant is still active.
         }
 
+        val isGame = requestCode == REQUEST_GAME
+        if (isGame) gameUri = uri else biosUri = uri
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        if (requestCode == REQUEST_GAME) {
-            gameUri = uri
-            prefs.edit().putString(KEY_GAME_URI, uri.toString()).apply()
-            engineStatus.text = "Game file registered. The PS2 core is not connected yet."
-        } else if (requestCode == REQUEST_BIOS) {
-            biosUri = uri
-            prefs.edit().putString(KEY_BIOS_URI, uri.toString()).apply()
-            engineStatus.text = "BIOS reference saved. BIOS validation will be performed by the PS2 core."
-        }
+        prefs.edit()
+            .putString(if (isGame) KEY_GAME_URI else KEY_BIOS_URI, uri.toString())
+            .apply()
+
+        engineStatus.text = "Importing $name into private app storage…"
         refreshFileLabels()
+
+        importExecutor.execute {
+            try {
+                val imported = GameFileImporter.import(
+                    resolver = contentResolver,
+                    uri = uri,
+                    displayName = name,
+                    kind = if (isGame) "game" else "bios",
+                    filesDirectory = filesDir
+                )
+                runOnUiThread {
+                    if (isGame) gameFile = imported.file else biosFile = imported.file
+                    prefs.edit()
+                        .putString(if (isGame) KEY_GAME_PATH else KEY_BIOS_PATH, imported.file.absolutePath)
+                        .apply()
+                    refreshFileLabels()
+                    engineStatus.text = buildString {
+                        append(if (isGame) "Game file imported successfully." else "BIOS file imported successfully.")
+                        append(" SHA-256: ")
+                        append(imported.sha256)
+                        append(". PS2 core is not connected yet.")
+                    }
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    engineStatus.text = "File import failed: ${error.message ?: error.javaClass.simpleName}"
+                    refreshFileLabels()
+                }
+            }
+        }
     }
 
     private fun refreshFileLabels() {
-        gameLabel.text = gameUri?.let { "Selected: ${queryDisplayName(it)}" } ?: "No PS2 game selected"
-        biosLabel.text = biosUri?.let { "Selected: ${queryDisplayName(it)}" } ?: "No BIOS selected"
+        gameLabel.text = describeFile(gameFile, gameUri, "No PS2 game selected")
+        biosLabel.text = describeFile(biosFile, biosUri, "No BIOS selected")
+    }
+
+    private fun describeFile(file: File?, uri: Uri?, emptyText: String): String {
+        if (file != null && file.isFile && file.length() > 0L) {
+            return "Ready: ${file.name}\n${formatSize(file.length())} • Private app storage"
+        }
+        return uri?.let { "Selected: ${queryDisplayName(it)} (not imported)" } ?: emptyText
+    }
+
+    private fun formatSize(bytes: Long): String {
+        if (bytes < 1024L) return "$bytes B"
+        val units = arrayOf("KB", "MB", "GB", "TB")
+        var value = bytes.toDouble()
+        var unit = -1
+        do {
+            value /= 1024.0
+            unit++
+        } while (value >= 1024.0 && unit < units.lastIndex)
+        return String.format(Locale.ROOT, "%.2f %s", value, units[unit])
     }
 
     private fun queryDisplayName(uri: Uri): String {
@@ -171,6 +226,11 @@ class MainActivity : Activity() {
         } finally {
             cursor?.close()
         }
+    }
+
+    override fun onDestroy() {
+        importExecutor.shutdown()
+        super.onDestroy()
     }
 
     private fun panel() = LinearLayout(this).apply {
@@ -208,6 +268,8 @@ class MainActivity : Activity() {
         private const val PREFS = "emucraft_library"
         private const val KEY_GAME_URI = "game_uri"
         private const val KEY_BIOS_URI = "bios_uri"
+        private const val KEY_GAME_PATH = "game_private_path"
+        private const val KEY_BIOS_PATH = "bios_private_path"
         private val GAME_EXTENSIONS = setOf("iso", "chd", "cso", "bin")
         private val BIOS_EXTENSIONS = setOf("bin", "rom", "bios")
         private const val BG = 0xFF0C0F18.toInt()
