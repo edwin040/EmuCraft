@@ -214,7 +214,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -223,7 +222,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.armsx2.ui.theme.EmuCraftUiPreferences
@@ -233,50 +235,103 @@ fun EmuCraftMascotOverlay() {
     if (EmuCraftUiPreferences.mascot.value == "Off") return
     var donghua by remember { mutableStateOf(EmuCraftUiPreferences.character.value == "Donghua") }
     val motion = rememberInfiniteTransition(label = "emucraftMascot")
-    val bob by motion.animateFloat(
-        initialValue = -3f, targetValue = 3f,
-        animationSpec = infiniteRepeatable(tween(1500, easing = LinearEasing), RepeatMode.Reverse),
-        label = "bob",
-    )
-    val blink by motion.animateFloat(
-        initialValue = 1f, targetValue = 0.12f,
-        animationSpec = infiniteRepeatable(tween(120, delayMillis = 2600), RepeatMode.Reverse),
-        label = "blink",
-    )
-    val animeAccent = Color(0xFFB58AFF)
-    val donghuaAccent = Color(0xFFFFC56B)
-    val accent = if (donghua) donghuaAccent else animeAccent
-    Box(Modifier.padding(12.dp), contentAlignment = Alignment.Center) {
-        Canvas(
-            Modifier.size(66.dp).shadow(5.dp, CircleShape).clickable {
-                donghua = !donghua
-            }
-        ) {
-            val cx = size.width / 2f
-            val cy = size.height / 2f + bob
-            val head = size.minDimension * 0.34f
-            drawCircle(Color(0xCC171522), radius = head * 1.28f, center = androidx.compose.ui.geometry.Offset(cx, cy))
-            // Hair silhouette / topknot
-            drawCircle(if (donghua) Color(0xFF34251B) else Color(0xFF29213D),
-                radius = head * 1.12f, center = androidx.compose.ui.geometry.Offset(cx, cy - head * 0.12f))
-            drawCircle(Color(0xFFFFDCCB), radius = head * 0.88f,
-                center = androidx.compose.ui.geometry.Offset(cx, cy + head * 0.12f))
-            // Fringe
-            val fringe = androidx.compose.ui.graphics.Path().apply {
-                moveTo(cx - head * 0.9f, cy - head * 0.15f)
-                quadraticTo(cx - head * 0.25f, cy - head * 1.3f, cx + head * 0.05f, cy - head * 0.48f)
-                quadraticTo(cx + head * 0.7f, cy - head * 1.05f, cx + head * 0.9f, cy - head * 0.05f)
+    val bob by motion.animateFloat(-2.5f, 2.5f,
+        infiniteRepeatable(tween(1900, easing = LinearEasing), RepeatMode.Reverse), label = "float")
+    val breeze by motion.animateFloat(-1f, 1f,
+        infiniteRepeatable(tween(2300, easing = LinearEasing), RepeatMode.Reverse), label = "breeze")
+    val wave by motion.animateFloat(-0.18f, 0.42f,
+        infiniteRepeatable(tween(720, easing = LinearEasing), RepeatMode.Reverse), label = "wave")
+    val glow by motion.animateFloat(-0.8f, 0.8f,
+        infiniteRepeatable(tween(2600, easing = LinearEasing), RepeatMode.Restart), label = "glow")
+    val blink by motion.animateFloat(1f, 0.08f,
+        infiniteRepeatable(tween(110, delayMillis = 3100), RepeatMode.Reverse), label = "blink")
+    val accent = if (donghua) Color(0xFFFFC56B) else Color(0xFFB58AFF)
+    val hair = if (donghua) Color(0xFF38251A) else Color(0xFF29213D)
+    val robe = if (donghua) Color(0xFF80552A) else Color(0xFF51408D)
+
+    Box(Modifier.padding(10.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(82.dp).shadow(7.dp, CircleShape).clickable { donghua = !donghua }) {
+            val w = size.width
+            val h = size.height
+            val cx = w * 0.49f
+            val cy = h * 0.39f + bob
+            val head = w * 0.235f
+            val halo = Offset(cx, cy + head * 0.2f)
+
+            // Soft aura and a travelling highlight give the badge a restrained premium glow.
+            drawCircle(Brush.radialGradient(listOf(accent.copy(alpha = 0.25f), Color.Transparent),
+                center = halo, radius = w * 0.49f), radius = w * 0.49f, center = halo)
+            val sweepX = w * (0.18f + (glow + 0.8f) * 0.40f)
+            drawLine(accent.copy(alpha = 0.30f), Offset(sweepX, h * 0.12f),
+                Offset(sweepX + w * 0.22f, h * 0.78f), strokeWidth = w * 0.045f)
+
+            // Wind-swept back hair / ribbon.
+            val backHair = Path().apply {
+                moveTo(cx - head * 0.65f, cy - head * 0.30f)
+                cubicTo(cx - head * 1.8f, cy - head * 1.05f + breeze * 3f,
+                    cx - head * 1.8f, cy + head * 0.25f + breeze * 5f,
+                    cx - head * 1.25f, cy + head * 0.55f + breeze * 3f)
+                cubicTo(cx - head * 0.8f, cy + head * 0.15f, cx - head * 0.5f, cy, cx - head * 0.65f, cy - head * 0.30f)
                 close()
             }
-            drawPath(fringe, if (donghua) Color(0xFF34251B) else Color(0xFF29213D))
-            val eyeY = cy + head * 0.18f
-            drawCircle(Color(0xFF35243B), head * 0.09f,
-                androidx.compose.ui.geometry.Offset(cx - head * 0.34f, eyeY), alpha = blink)
-            drawCircle(Color(0xFF35243B), head * 0.09f,
-                androidx.compose.ui.geometry.Offset(cx + head * 0.34f, eyeY), alpha = blink)
-            drawCircle(accent, head * 0.12f, androidx.compose.ui.geometry.Offset(cx, cy + head * 1.12f))
-            drawCircle(accent, head * 1.26f, androidx.compose.ui.geometry.Offset(cx, cy),
-                style = Stroke(width = 2.dp.toPx()))
+            drawPath(backHair, hair)
+
+            // Small robe silhouette and scarf tails that sway with the breeze.
+            val robePath = Path().apply {
+                moveTo(cx - head * 0.78f, cy + head * 0.92f)
+                quadraticTo(cx, cy + head * 0.55f, cx + head * 0.78f, cy + head * 0.92f)
+                lineTo(cx + head * 1.10f, cy + head * 2.35f)
+                quadraticTo(cx, cy + head * 2.72f, cx - head * 1.10f, cy + head * 2.35f)
+                close()
+            }
+            drawPath(robePath, robe)
+            val scarf = Path().apply {
+                moveTo(cx + head * 0.45f, cy + head * 0.90f)
+                cubicTo(cx + head * 1.25f, cy + head * 1.25f + breeze * 5f,
+                    cx + head * 1.65f, cy + head * 1.00f + breeze * 8f,
+                    cx + head * 1.85f, cy + head * 1.40f + breeze * 7f)
+                lineTo(cx + head * 1.38f, cy + head * 1.65f + breeze * 6f)
+                quadraticTo(cx + head * 0.95f, cy + head * 1.35f, cx + head * 0.45f, cy + head * 0.90f)
+                close()
+            }
+            drawPath(scarf, accent.copy(alpha = 0.88f))
+
+            // Raised waving arm, animated gently at the wrist.
+            val shoulder = Offset(cx + head * 0.70f, cy + head * 1.20f)
+            val elbow = Offset(cx + head * 1.28f, cy + head * 0.85f)
+            val hand = Offset(cx + head * (1.42f + wave * 0.28f), cy + head * (0.30f + wave * 0.10f))
+            drawLine(robe.copy(alpha = 0.95f), shoulder, elbow, strokeWidth = head * 0.30f)
+            drawLine(Color(0xFFFFDCCB), elbow, hand, strokeWidth = head * 0.22f)
+            drawCircle(Color(0xFFFFDCCB), head * 0.16f, hand)
+
+            // Face, hair cap and a clean highlight on the fringe.
+            drawCircle(hair, head * 1.12f, Offset(cx, cy - head * 0.06f))
+            drawCircle(Color(0xFFFFDCCB), head * 0.88f, Offset(cx, cy + head * 0.16f))
+            val fringe = Path().apply {
+                moveTo(cx - head * 0.92f, cy - head * 0.08f)
+                cubicTo(cx - head * 0.70f, cy - head * 1.45f, cx + head * 0.05f, cy - head * 1.20f, cx + head * 0.18f, cy - head * 0.48f)
+                cubicTo(cx + head * 0.55f, cy - head * 1.00f, cx + head * 0.95f, cy - head * 0.58f, cx + head * 0.90f, cy + head * 0.02f)
+                close()
+            }
+            drawPath(fringe, hair)
+            drawLine(accent.copy(alpha = 0.8f), Offset(cx - head * 0.45f, cy - head * 0.67f),
+                Offset(cx + head * 0.12f, cy - head * 0.82f), strokeWidth = head * 0.075f)
+
+            val eyeY = cy + head * 0.20f
+            drawLine(Color(0xFF38283C), Offset(cx - head * 0.48f, eyeY),
+                Offset(cx - head * 0.20f, eyeY), strokeWidth = head * 0.10f, alpha = blink)
+            drawLine(Color(0xFF38283C), Offset(cx + head * 0.20f, eyeY),
+                Offset(cx + head * 0.48f, eyeY), strokeWidth = head * 0.10f, alpha = blink)
+            drawCircle(Color(0xFFE99A9A), head * 0.075f, Offset(cx - head * 0.53f, cy + head * 0.43f), alpha = 0.55f)
+            drawCircle(Color(0xFFE99A9A), head * 0.075f, Offset(cx + head * 0.53f, cy + head * 0.43f), alpha = 0.55f)
+
+            // Fine orbit ring and two moving light particles.
+            drawCircle(accent.copy(alpha = 0.68f), w * 0.43f, Offset(cx, cy + head * 0.55f),
+                style = Stroke(width = 1.15.dp.toPx()))
+            drawCircle(Color.White.copy(alpha = 0.72f), w * 0.025f,
+                Offset(w * (0.24f + (glow + 0.8f) * 0.25f), h * 0.25f))
+            drawCircle(accent.copy(alpha = 0.85f), w * 0.018f,
+                Offset(w * (0.78f - (glow + 0.8f) * 0.18f), h * 0.70f))
         }
     }
 }
