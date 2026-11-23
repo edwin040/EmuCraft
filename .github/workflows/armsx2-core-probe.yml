@@ -38,10 +38,22 @@ jobs:
         with:
           packages: platform-tools
 
-      - name: Install pinned Android native toolchain
+      # The upstream branch currently declares API 37, but that SDK package is
+      # not published in the runner's configured repositories. Probe with API 36
+      # while keeping the pinned NDK/CMake versions and ARM64 target unchanged.
+      - name: Install available Android native toolchain
         run: |
           yes | sdkmanager --licenses
-          sdkmanager "platforms;android-37" "build-tools;37.0.0" "ndk;29.0.14206865" "cmake;3.31.6"
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.14206865" "cmake;3.31.6"
+
+      - name: Adapt probe compile/target SDK to installed API 36
+        working-directory: upstream/ARMSX2
+        run: |
+          sed -i 's/compileSdk = 37/compileSdk = 36/' platforms/android/app/build.gradle.kts
+          sed -i 's/targetSdk = 37/targetSdk = 36/' platforms/android/app/build.gradle.kts
+          grep -q 'compileSdk = 36' platforms/android/app/build.gradle.kts
+          grep -q 'targetSdk = 36' platforms/android/app/build.gradle.kts
+          grep -q 'ndkVersion.*29.0.14206865' platforms/android/app/build.gradle.kts
 
       - name: Fetch shaderc third-party dependencies
         working-directory: upstream/ARMSX2/platforms/android
@@ -50,13 +62,12 @@ jobs:
       - name: Install Rust Android target
         run: rustup target add aarch64-linux-android
 
-      - name: Verify upstream pin and Android build configuration
+      - name: Verify upstream pin and ARM64 configuration
         working-directory: upstream/ARMSX2
         run: |
           test "$(git rev-parse HEAD)" = "a2914992c8c507d4c196464dbcf773fc7b0d0def"
-          grep -q 'ndkVersion.*29.0.14206865' platforms/android/app/build.gradle.kts
-          grep -q 'compileSdk = 37' platforms/android/app/build.gradle.kts
-          git status --short
+          grep -q 'abiFilters.add("arm64-v8a")' platforms/android/app/build.gradle.kts
+          git diff --check
 
       - name: Build upstream Android debug APK
         working-directory: upstream/ARMSX2/platforms/android
