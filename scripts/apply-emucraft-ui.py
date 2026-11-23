@@ -272,15 +272,35 @@ fun EmuCraftAnimatedBackground(modifier: Modifier = Modifier) {
                 style = Stroke(width = (8f - i).dp.toPx()))
         }
 
-        // Deterministic drifting sparks; their positions animate without allocating particle objects.
-        for (i in 0 until 34) {
+        // Dimensional rift fragments: angular glass-like shards drift and rotate gently.
+        for (i in 0 until 18) {
             val seed = i * 0.6180339f
-            val x = ((seed + drift * (0.08f + (i % 5) * 0.025f)) % 1f) * w
-            val y = (((i * 0.173f) + drift * (if (i % 2 == 0) 0.13f else -0.09f) + 1f) % 1f) * h
-            val pulse = (0.35f + 0.65f * sin((shimmer * 2f * PI.toFloat()) + i).toFloat().let { (it + 1f) / 2f })
-            val radius = (1.1f + (i % 4) * 0.55f) * density
-            drawCircle(if (i % 3 == 0) secondary.copy(alpha = pulse * 0.62f) else accent.copy(alpha = pulse * 0.72f),
-                radius, Offset(x, y))
+            val x = ((seed + drift * (0.035f + (i % 4) * 0.018f)) % 1f) * w
+            val y = (((i * 0.217f) + drift * (if (i % 2 == 0) 0.075f else -0.055f) + 1f) % 1f) * h
+            val pulse = 0.35f + 0.65f * ((sin(shimmer * 2f * PI.toFloat() + i * 1.7f) + 1f) / 2f)
+            val shardW = (5f + (i % 4) * 2.5f) * density
+            val shardH = (13f + (i % 5) * 4f) * density
+            val tilt = sin(drift * 2f * PI.toFloat() + i) * shardW * 0.7f
+            val shard = Path().apply {
+                moveTo(x, y - shardH)
+                lineTo(x + shardW + tilt, y - shardH * 0.12f)
+                lineTo(x + tilt * 0.25f, y + shardH)
+                lineTo(x - shardW * 0.55f, y + shardH * 0.18f)
+                close()
+            }
+            drawPath(shard, secondary.copy(alpha = pulse * 0.20f))
+            drawPath(shard, accent.copy(alpha = pulse * 0.56f), style = Stroke(width = 0.8f.dp.toPx()))
+        }
+
+        // Fine light particles and occasional bright glints; no flowers or petal shapes.
+        for (i in 0 until 42) {
+            val seed = i * 0.75487766f
+            val x = ((seed + drift * (0.055f + (i % 6) * 0.014f)) % 1f) * w
+            val y = (((i * 0.137f) + drift * (if (i % 2 == 0) 0.11f else -0.08f) + 1f) % 1f) * h
+            val pulse = (sin(shimmer * 2f * PI.toFloat() + i * 1.31f) + 1f) / 2f
+            val radius = (0.9f + (i % 3) * 0.55f) * density
+            drawCircle(if (i % 4 == 0) secondary.copy(alpha = 0.24f + pulse * 0.42f)
+                else accent.copy(alpha = 0.18f + pulse * 0.48f), radius, Offset(x, y))
         }
 
 
