@@ -72,6 +72,14 @@ object EmuCraftUiPreferences {
         character.value = MainActivityRuntime.prefs.getString(CharacterKey, "Anime") ?: "Anime"
         mascot.value = MainActivityRuntime.prefs.getString(MascotKey, "Both") ?: "Both"
         ToolbarPositionPreferences.set(mode.value == "Console")
+        val light = ThemePreferences.mode.value in listOf(ThemeMode.Light, ThemeMode.AnimeLight, ThemeMode.DonghuaLight)
+        ThemePreferences.set(
+            if (character.value == "Donghua") {
+                if (light) ThemeMode.DonghuaLight else ThemeMode.DonghuaDark
+            } else {
+                if (light) ThemeMode.AnimeLight else ThemeMode.AnimeDark
+            }
+        )
     }
 
     fun setMode(value: String) {
@@ -117,7 +125,7 @@ runtime = runtime_path.read_text()
 load_marker = "        com.armsx2.ui.theme.LibraryChromePreferences.load()"
 assert load_marker in runtime
 if "EmuCraftUiPreferences.load()" not in runtime:
-    runtime = runtime.replace(load_marker, load_marker + "\\n        com.armsx2.ui.theme.EmuCraftUiPreferences.load()", 1)
+    runtime = runtime.replace(load_marker, load_marker + "\n        com.armsx2.ui.theme.EmuCraftUiPreferences.load()", 1)
 runtime_path.write_text(runtime)
 
 # Add a dedicated EmuCraft appearance panel in the existing App settings.
