@@ -58,6 +58,9 @@ jobs:
           grep -q 'lifecycle = "2.10.0"' platforms/android/gradle/libs.versions.toml
           grep -q 'ndkVersion.*29.0.14206865' platforms/android/app/build.gradle.kts
 
+      - name: Apply EmuCraft UI customization
+        run: python3 scripts/apply-emucraft-ui.py
+
       - name: Fetch shaderc third-party dependencies
         working-directory: upstream/ARMSX2/platforms/android
         run: python3 app/src/main/cpp/3rdparty/shaderc/utils/git-sync-deps
