@@ -82,3 +82,34 @@ Normal starts from balanced defaults. Manual exposes the underlying supported em
 ## 6. Current build status
 
 The GitHub Actions run for commit `48ef3063ef4d2e1f0862ccc125d6022b180e3f37` completed successfully and uploaded the `emucraft-arm64-debug-apk` artifact. This confirms compilation and packaging only; it does not prove that BIOS boot, game emulation, or all emulator features have passed device testing.
+
+
+## 7. Pinned ARMSX2 implementation inventory
+
+Inspected against upstream revision `a2914992c8c507d4c196464dbcf773fc7b0d0def` used by CI.
+
+### Engine settings already exposed by the pinned Android source
+- CPU / speed: EE cycle rate and skip, MTVU, IOP thread, VU1 instant, VU flag hack, fast CDVD, INTC_STAT, wait-loop detection, recompiler and clamp controls.
+- Frame pacing: native frame limiter, nominal speed percentage, and a separate presentation FPS cap. The latter drops display presents and does not slow emulation.
+- Graphics: renderer backend, internal resolution multiplier, blending accuracy, hardware mipmaps, texture preloading, hardware download mode, filtering, FXAA, texture upscaling and other GS options.
+- Persistence / native bridge: `Settings.applyTo()` maps the Kotlin settings model to `NativeApp.setSetting()` followed by `commitSettings()`. `ConfigStore` keeps global settings and sparse per-game overrides; `InGameOverlay.saveSettings()` uses the active scope.
+- Device signals: `DeviceTier` already checks CPU core count, low-RAM flag and total RAM; `Thermals.kt` and `BatteryWatcher.kt` exist for best-effort thermal/power signals. GPU/renderer detection is in `GpuInfo.kt`.
+
+### BIOS, library and save systems inherited from upstream
+- BIOS: upstream contains `BiosInfo.kt`, native BIOS inspection and setup state for the selected BIOS, source folder and private BIOS copy. The user supplies the BIOS.
+- Game library: upstream `MainActivityRuntime` persists multiple SAF ROM folder URIs, subfolder scan policy and deduplicates library results. `GameInfo.kt` contains library metadata, hidden-game and category handling.
+- Game boot: upstream runtime and native bridge provide the VM launch path. This still needs an actual BIOS + legally obtained game image test on physical hardware.
+- Save states: upstream Android runtime and in-game menu include save/load-state flows; validate persistence and restore on device.
+- Memory cards: upstream includes `MemoryCardBackup.kt` and `memcard/Ps2MemoryCard.kt`; validate card creation, selection, writes, backup and restore on device.
+
+These are inherited engine capabilities, not proof of end-to-end functionality in the EmuCraft-branded APK. The CI build does not exercise storage permissions, native BIOS validation, game boot, state restore or memory-card writes.
+
+## 8. EmuCraft performance profile implementation
+
+The UI patch now adds four profile choices to the upstream Performance tab:
+- FPS Max: native resolution, lower-cost blending/mipmap/preload settings and selected CPU speedhacks.
+- Graphics Max: 2x internal resolution, higher blending quality, full texture preloading and FXAA.
+- Device Performance: uses upstream `DeviceTier.isLowEnd()`, based on Android low-RAM status, CPU core count and total RAM; applies the low-end preset or a balanced 1.5x preset.
+- Normal / Manual: preserves current values and does not overwrite custom tuning.
+
+The profiles operate on the upstream `Settings` object and use `InGameOverlay.saveSettings()`, so they feed the same native setting-commit path and respect Global/Game scope. Exact preset matching is used to display Manual when settings are custom. Thermal adaptation remains a later task; device heuristics are not a benchmark or FPS guarantee.
