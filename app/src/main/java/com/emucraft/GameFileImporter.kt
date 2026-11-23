@@ -3,6 +3,7 @@ package com.emucraft
 import android.content.ContentResolver
 import android.net.Uri
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.security.MessageDigest
@@ -11,7 +12,7 @@ import java.util.Locale
 /**
  * Copies SAF-selected content into app-private storage.
  *
- * The native emulator core will need ordinary filesystem paths; content:// URIs
+ * The native emulator core needs ordinary filesystem paths; content:// URIs
  * are not paths and may become unreadable when a provider revokes temporary access.
  */
 object GameFileImporter {
@@ -20,6 +21,9 @@ object GameFileImporter {
         val sizeBytes: Long,
         val sha256: String
     )
+
+    private val gameExtensions = setOf("iso", "chd", "cso", "bin")
+    private val biosExtensions = setOf("bin", "rom", "bios")
 
     @Throws(IOException::class)
     fun importFile(
@@ -31,6 +35,16 @@ object GameFileImporter {
     ): ImportedFile {
         require(kind == "game" || kind == "bios") { "Unsupported import type." }
 
+        val originalName = displayName.substringAfterLast('/').substringAfterLast('\\')
+        val extension = originalName.substringAfterLast('.', "").lowercase(Locale.ROOT)
+        val allowedExtensions = if (kind == "game") gameExtensions else biosExtensions
+        if (extension !in allowedExtensions) {
+            throw IOException(
+                if (kind == "game") "Format game tidak didukung. Pilih ISO, CHD, CSO, atau BIN."
+                else "Format BIOS tidak didukung. Pilih BIN, ROM, atau BIOS."
+            )
+        }
+
         val importDirectory = File(filesDirectory, "emucraft/imports")
         if (!importDirectory.exists() && !importDirectory.mkdirs()) {
             throw IOException("Could not create the private import directory.")
@@ -39,8 +53,7 @@ object GameFileImporter {
             throw IOException("The private import path is not a directory.")
         }
 
-        val safeName = displayName
-            .substringAfterLast('/')
+        val safeName = originalName
             .replace(Regex("[^A-Za-z0-9._-]"), "_")
             .trim('_')
             .takeLast(80)
@@ -73,14 +86,16 @@ object GameFileImporter {
                 throw IOException("The selected file is empty.")
             }
 
-            val hash = digest.digest().joinToString("") { "%02x".format(Locale.ROOT, it.toInt() and 0xff) }
+            val hash = digest.digest().toHex()
             val finalFile = File(importDirectory, "${kind}_${hash.take(16)}_${safeName}")
 
             if (finalFile.exists()) {
-                if (finalFile.length() != copiedBytes) {
-                    throw IOException("A file-name collision was detected; import was stopped safely.")
+                if (finalFile.length() != copiedBytes || sha256Of(finalFile) != hash) {
+                    throw IOException("A file-name/hash collision was detected; import was stopped safely.")
                 }
-                temporary.delete()
+                if (!temporary.delete()) {
+                    throw IOException("Could not clean up the temporary imported file.")
+                }
             } else if (!temporary.renameTo(finalFile)) {
                 throw IOException("Could not finalize the imported file.")
             }
@@ -92,4 +107,20 @@ object GameFileImporter {
             throw IOException("Import failed: ${error.message ?: error.javaClass.simpleName}", error)
         }
     }
+
+    private fun sha256Of(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        FileInputStream(file).use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                if (count > 0) digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().toHex()
+    }
+
+    private fun ByteArray.toHex(): String =
+        joinToString("") { "%02x".format(Locale.ROOT, it.toInt() and 0xff) }
 }
