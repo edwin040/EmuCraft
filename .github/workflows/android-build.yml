@@ -57,6 +57,20 @@ jobs:
           grep -q 'coreKtx = "1.18.0"' platforms/android/gradle/libs.versions.toml
           grep -q 'lifecycle = "2.10.0"' platforms/android/gradle/libs.versions.toml
           grep -q 'ndkVersion.*29.0.14206865' platforms/android/app/build.gradle.kts
+          # CI already installs JDK 17; remove Foojay auto-provisioner to avoid
+          # fragile external plugin-portal resolution during settings evaluation.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("platforms/android/settings.gradle.kts")
+          text = p.read_text()
+          block = '''plugins {
+              id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+          }
+          '''
+          if block not in text:
+              raise SystemExit("Foojay plugin block not found; refusing unexpected settings edit")
+          p.write_text(text.replace(block, "", 1))
+          PY
 
       - name: Apply EmuCraft UI customization
         run: python3 scripts/apply-emucraft-ui.py
