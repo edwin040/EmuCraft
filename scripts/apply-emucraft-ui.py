@@ -556,3 +556,27 @@ visual = visual.replace(
 )
 visual = visual.replace("0.27f", "0.11f").replace("0.26f", "0.10f")
 visual_path.write_text(visual)
+
+
+# Glass/transparent library chrome: let the character artwork remain visible beneath
+# the top menu pill instead of painting an opaque theme surface over it.
+chrome_path = root / "java/com/armsx2/ui/common/ArmsComponents.kt"
+chrome = chrome_path.read_text()
+old_chrome = """        color = com.armsx2.ui.theme.LibraryChromePreferences.barColor.value
+            .takeIf { it != 0 }?.let { Color(it) } ?: MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.38f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 5.dp,
+"""
+new_chrome = """        color = (com.armsx2.ui.theme.LibraryChromePreferences.barColor.value
+            .takeIf { it != 0 }?.let { Color(it) } ?: MaterialTheme.colorScheme.surface)
+            .copy(alpha = 0.34f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 2.dp,
+"""
+if old_chrome not in chrome:
+    raise RuntimeError("ArmsTopBar chrome surface anchor not found; refusing unsafe replacement")
+chrome = chrome.replace(old_chrome, new_chrome, 1)
+chrome_path.write_text(chrome)
+
