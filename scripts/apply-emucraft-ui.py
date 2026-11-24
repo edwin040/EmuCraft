@@ -326,6 +326,44 @@ fun EmuCraftAnimatedBackground(modifier: Modifier = Modifier) {
 }
 """)
 
+
+# Final clean cinematic treatment: artwork is the hero; animation is sparse and luminous.
+import re
+visual = visual_path.read_text()
+visual = visual.replace(
+    'val donghuaArtwork = if (donghua) ImageBitmap.imageResource(R.drawable.emucraft_donghua_bg) else null',
+    'val donghuaArtwork = ImageBitmap.imageResource(R.drawable.emucraft_donghua_bg)'
+)
+visual = re.sub(r'        if \(donghuaArtwork != null\) \{.*?\n        \}\n', 
+    '        drawImage(donghuaArtwork, dstSize = IntSize(w.toInt(), h.toInt()), alpha = 1.0f)\n', visual, count=1, flags=re.S)
+visual = re.sub(r'        drawRect\(Brush\.verticalGradient\(.*?\)\)\)\n', '', visual, count=1)
+visual = re.sub(r'        // Broad atmospheric glow,.*?\n        // Two elegant curved ribbons, travelling slowly across the scene\..*?\n        \}\n', '', visual, count=1, flags=re.S)
+visual = re.sub(r'        // Dimensional rift fragments:.*?\n        \}\n\n        // Fine light particles', '        // Fine light particles', visual, count=1, flags=re.S)
+visual = visual.replace('for (i in 0 until 42) {', 'for (i in 0 until 30) {')
+# Keep only a few edge crystals; avoid placing them over the character.
+visual = visual.replace('for (i in 0 until 18) {', 'for (i in 0 until 6) {')
+visual = visual.replace(
+    'val x = ((seed + drift * (0.035f + (i % 4) * 0.018f)) % 1f) * w',
+    'val x = if (i % 2 == 0) w * (0.025f + seed * 0.04f) else w * (0.94f - seed * 0.04f)'
+)
+visual = visual.replace('val radius = (0.9f + (i % 3) * 0.55f) * density',
+    'val radius = (1.0f + (i % 3) * 0.65f) * density')
+visual = visual.replace(
+    'drawCircle(if (i % 4 == 0) secondary.copy(alpha = 0.24f + pulse * 0.42f)\n                else accent.copy(alpha = 0.18f + pulse * 0.48f), radius, Offset(x, y))',
+    '''val point = Offset(x, y)
+            if (i % 7 == 0) {
+                drawCircle(Brush.radialGradient(
+                    listOf(Color.White.copy(alpha = 0.52f * pulse), accent.copy(alpha = 0.24f * pulse), Color.Transparent),
+                    center = point, radius = radius * 9f
+                ), radius * 9f, point)
+                drawLine(Color.White.copy(alpha = 0.68f * pulse),
+                    Offset(x - radius * 3f, y), Offset(x + radius * 3f, y), 0.8f.dp.toPx())
+            }
+            drawCircle(if (i % 4 == 0) secondary.copy(alpha = 0.28f + pulse * 0.46f)
+                else accent.copy(alpha = 0.20f + pulse * 0.50f), radius, point)'''
+)
+visual_path.write_text(visual)
+
 audio_path = root / "java/com/armsx2/ui/home/EmuCraftAmbientAudio.kt"
 audio_path.write_text("""package com.armsx2.ui.home
 
