@@ -524,3 +524,63 @@ performance = performance.replace(profile_marker, profile_ui + profile_marker, 1
 performance_path.write_text(performance)
 
 print("Applied EmuCraft animated Anime/Donghua backgrounds, performance profiles, optional ambient soundtrack, and removed mascot overlay.")
+
+
+// Final visual pass: keep artwork visible and add layered bloom/glints similar to
+// premium mobile-game lobby/loading scenes. The art remains behind all library controls.
+visual = visual_path.read_text()
+visual = visual.replace(
+    'val donghuaArtwork = if (donghua) ImageBitmap.imageResource(R.drawable.emucraft_donghua_bg) else null',
+    'val donghuaArtwork = ImageBitmap.imageResource(R.drawable.emucraft_donghua_bg)'
+)
+visual = visual.replace(
+    'if (donghuaArtwork != null) {\n            drawImage(donghuaArtwork, dstSize = IntSize(w.toInt(), h.toInt()), alpha = if (light) 0.62f else 0.48f)\n        }\n        drawRect(Brush.verticalGradient(listOf(upper.copy(alpha = if (donghuaArtwork != null) 0.10f else 0.88f), base.copy(alpha = if (donghuaArtwork != null) 0.14f else 0.94f), deep.copy(alpha = if (donghuaArtwork != null) 0.20f else 0.98f))))',
+    'drawImage(donghuaArtwork, dstSize = IntSize(w.toInt(), h.toInt()), alpha = 1.0f)\n        drawRect(Brush.verticalGradient(listOf(upper.copy(alpha = 0.10f), base.copy(alpha = 0.18f), deep.copy(alpha = 0.30f))))'
+)
+visual = visual.replace(
+    'for (i in 0 until 42) {',
+    'for (i in 0 until 88) {'
+)
+visual = visual.replace(
+    'drawCircle(if (i % 4 == 0) secondary.copy(alpha = 0.24f + pulse * 0.42f)\n                else accent.copy(alpha = 0.18f + pulse * 0.48f), radius, Offset(x, y))',
+    '''val point = Offset(x, y)
+            val bright = i % 9 == 0
+            // Wide low-alpha halo + compact hot core creates a real luminous particle.
+            if (bright) {
+                drawCircle(
+                    Brush.radialGradient(
+                        listOf(Color.White.copy(alpha = 0.34f * pulse), accent.copy(alpha = 0.22f * pulse), Color.Transparent),
+                        center = point, radius = radius * 12f
+                    ), radius * 12f, point
+                )
+                drawLine(Color.White.copy(alpha = 0.78f * pulse),
+                    Offset(x - radius * 4f, y), Offset(x + radius * 4f, y),
+                    strokeWidth = 0.7f.dp.toPx())
+                drawLine(accent.copy(alpha = 0.68f * pulse),
+                    Offset(x, y - radius * 5f), Offset(x, y + radius * 5f),
+                    strokeWidth = 0.7f.dp.toPx())
+            } else {
+                drawCircle(accent.copy(alpha = 0.12f + pulse * 0.20f), radius * 3.2f, point)
+            }
+            drawCircle(if (bright) Color.White.copy(alpha = 0.72f * pulse)
+                else if (i % 4 == 0) secondary.copy(alpha = 0.24f + pulse * 0.42f)
+                else accent.copy(alpha = 0.18f + pulse * 0.48f), radius, point)'''
+)
+# Add two sweeping light streaks with a soft halo.
+visual = visual.replace(
+    '        // Dimensional rift fragments: angular glass-like shards drift and rotate gently.',
+    '''        // Sweeping energy streaks: broad bloom under a sharp travelling highlight.
+        for (i in 0..3) {
+            val travel = (drift + i * 0.24f) % 1f
+            val y = h * (0.18f + i * 0.19f)
+            val start = Offset(-w * 0.15f + travel * w * 0.35f, y)
+            val end = Offset(w * (0.72f + travel * 0.32f), y + h * (0.12f - i * 0.035f))
+            drawLine(accent.copy(alpha = 0.10f), start, end, strokeWidth = 15.dp.toPx())
+            drawLine(secondary.copy(alpha = 0.20f), start, end, strokeWidth = 4.dp.toPx())
+            drawLine(Color.White.copy(alpha = 0.24f), start, end, strokeWidth = 1.dp.toPx())
+        }
+
+        // Dimensional rift fragments: angular glass-like shards drift and rotate gently.'''
+)
+visual_path.write_text(visual)
+print("Applied final artwork visibility and cinematic bloom pass.")
