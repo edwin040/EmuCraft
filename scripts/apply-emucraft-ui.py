@@ -580,3 +580,25 @@ if old_chrome not in chrome:
 chrome = chrome.replace(old_chrome, new_chrome, 1)
 chrome_path.write_text(chrome)
 
+
+
+# Remove the translucent smoke-like ribbons and restore full artwork clarity.
+visual = visual_path.read_text()
+visual = visual.replace(
+    'drawImage(donghuaArtwork, dstSize = IntSize(w.toInt(), h.toInt()), alpha = if (light) 0.62f else 0.48f)',
+    'drawImage(donghuaArtwork, dstSize = IntSize(w.toInt(), h.toInt()), alpha = 1.0f)'
+)
+visual = visual.replace(
+    'drawRect(Brush.verticalGradient(listOf(upper.copy(alpha = if (donghuaArtwork != null) 0.10f else 0.88f), base.copy(alpha = if (donghuaArtwork != null) 0.14f else 0.94f), deep.copy(alpha = if (donghuaArtwork != null) 0.20f else 0.98f))))',
+    'drawRect(Brush.verticalGradient(listOf(upper.copy(alpha = 0.015f), base.copy(alpha = 0.025f), deep.copy(alpha = 0.045f))))'
+)
+# Exact anchors are used so this change fails loudly if upstream layout changes.
+ribbon_start = '        // Two elegant curved ribbons, travelling slowly across the scene.\n'
+ribbon_end = '        // Dimensional rift fragments: angular glass-like shards drift and rotate gently.\n'
+if ribbon_start in visual and ribbon_end in visual:
+    a = visual.index(ribbon_start)
+    b = visual.index(ribbon_end, a)
+    visual = visual[:a] + '        // No smoke/ribbon overlay: preserve the clean focal artwork.\n\n' + visual[b:]
+elif ribbon_start in visual:
+    raise RuntimeError("Ribbon end anchor missing; refusing partial removal")
+visual_path.write_text(visual)
