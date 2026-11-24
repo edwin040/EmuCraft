@@ -538,3 +538,21 @@ visual = visual.replace('for (i in 0 until 42) {', 'for (i in 0 until 88) {')
 visual_path.write_text(visual)
 
 print("Applied EmuCraft animated backgrounds, luminous particles, performance profiles, optional ambient soundtrack, and removed mascot overlay.")
+
+
+# Composition correction: keep the focal artwork unobstructed.
+import re
+visual = visual_path.read_text()
+visual = re.sub(
+    r"        // Two elegant curved ribbons.*?        // Dimensional rift fragments",
+    "        // Center kept clear: no energy ribbons crossing the character or focal artwork.\n\n        // Dimensional rift fragments",
+    visual,
+    flags=re.S,
+)
+visual = visual.replace("for (i in 0 until 18) {", "for (i in 0 until 8) {")
+visual = visual.replace(
+    "val x = ((seed + drift * (0.035f + (i % 4) * 0.018f)) % 1f) * w",
+    "val x = if (i % 2 == 0) w * (0.025f + seed * 0.045f) else w * (0.93f - seed * 0.045f)"
+)
+visual = visual.replace("0.27f", "0.11f").replace("0.26f", "0.10f")
+visual_path.write_text(visual)
