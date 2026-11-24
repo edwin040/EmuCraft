@@ -227,6 +227,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.res.imageResource
+import com.armsx2.R
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -241,6 +242,7 @@ import kotlin.math.sin
 @Composable
 fun EmuCraftAnimatedBackground(modifier: Modifier = Modifier) {
     val donghua = EmuCraftUiPreferences.character.value == "Donghua"
+    val donghuaArtwork = if (donghua) ImageBitmap.imageResource(R.drawable.emucraft_donghua_bg) else null
     val light = ThemePreferences.mode.value in listOf(ThemeMode.AnimeLight, ThemeMode.DonghuaLight)
     val deep = if (donghua) Color(0xFF21170E) else Color(0xFF15132A)
     val mid = if (donghua) Color(0xFF573A20) else Color(0xFF30245C)
@@ -261,6 +263,9 @@ fun EmuCraftAnimatedBackground(modifier: Modifier = Modifier) {
         val upper = if (light) {
             if (donghua) Color(0xFF6F5033) else Color(0xFF343C70)
         } else mid
+        if (donghuaArtwork != null) {
+            drawImage(donghuaArtwork, dstSize = IntSize(w.toInt(), h.toInt()), alpha = if (light) 0.62f else 0.48f)
+        }
         drawRect(Brush.verticalGradient(listOf(upper.copy(alpha = if (donghuaArtwork != null) 0.10f else 0.88f), base.copy(alpha = if (donghuaArtwork != null) 0.14f else 0.94f), deep.copy(alpha = if (donghuaArtwork != null) 0.20f else 0.98f))))
 
         // Broad atmospheric glow, deliberately low contrast behind game covers and labels.
