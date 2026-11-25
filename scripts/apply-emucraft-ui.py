@@ -640,3 +640,247 @@ if ribbon_start in visual and ribbon_end in visual:
 elif ribbon_start in visual:
     raise RuntimeError("Ribbon end anchor missing; refusing partial removal")
 visual_path.write_text(visual)
+
+
+# Final cinematic background pass: dark violet ambience, subject spotlight,
+# moving particles, and flowing ribbons aligned with the artwork's diagonal light.
+visual_path.write_text("""package com.armsx2.ui.home
+
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.imageResource
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import com.armsx2.R
+import kotlin.math.PI
+import kotlin.math.sin
+
+@Composable
+fun EmuCraftAnimatedBackground(modifier: Modifier = Modifier) {
+    val artwork = ImageBitmap.imageResource(R.drawable.emucraft_donghua_bg)
+    val transition = rememberInfiniteTransition(label = "emucraftCinematic")
+    val drift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(26000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "particleDrift",
+    )
+    val shimmer by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(5200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "lightShimmer",
+    )
+
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val w = size.width
+        val h = size.height
+        val tau = 2f * PI.toFloat()
+        val violet = Color(0xFFB69BFF)
+        val lilac = Color(0xFFE3C7FF)
+        val blue = Color(0xFF78B8FF)
+        val pink = Color(0xFFFFA7F2)
+
+        // Crop the artwork to the display aspect ratio without stretching the character.
+        val imageRatio = artwork.width.toFloat() / artwork.height.toFloat()
+        val viewRatio = w / h
+        val srcOffset: IntOffset
+        val srcSize: IntSize
+        if (imageRatio > viewRatio) {
+            val cropWidth = (artwork.height * viewRatio).toInt().coerceAtLeast(1)
+            srcOffset = IntOffset(((artwork.width - cropWidth) / 2).coerceAtLeast(0), 0)
+            srcSize = IntSize(cropWidth, artwork.height)
+        } else {
+            val cropHeight = (artwork.width / viewRatio).toInt().coerceAtLeast(1)
+            srcOffset = IntOffset(0, ((artwork.height - cropHeight) / 2).coerceAtLeast(0))
+            srcSize = IntSize(artwork.width, cropHeight)
+        }
+        drawImage(
+            image = artwork,
+            srcOffset = srcOffset,
+            srcSize = srcSize,
+            dstSize = IntSize(w.toInt().coerceAtLeast(1), h.toInt().coerceAtLeast(1)),
+        )
+
+        // Darken the scene gently, keeping the original colors and details visible.
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF09091C).copy(alpha = 0.22f),
+                    Color(0xFF11102C).copy(alpha = 0.12f),
+                    Color(0xFF08091B).copy(alpha = 0.30f),
+                ),
+            ),
+        )
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(
+                    Color(0xFF080A20).copy(alpha = 0.14f),
+                    Color.Transparent,
+                    Color(0xFF080A20).copy(alpha = 0.10f),
+                ),
+            ),
+        )
+
+        // Soft illumination falls over the character so the face and clothing remain readable.
+        val characterCenter = Offset(w * 0.70f, h * 0.43f)
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFE4D5FF).copy(alpha = 0.25f),
+                    Color(0xFF9E8BFF).copy(alpha = 0.13f),
+                    Color.Transparent,
+                ),
+                center = characterCenter,
+                radius = w * 0.43f,
+            ),
+            radius = w * 0.43f,
+            center = characterCenter,
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color.White.copy(alpha = 0.13f), Color.Transparent),
+                center = Offset(w * 0.67f, h * 0.25f),
+                radius = w * 0.17f,
+            ),
+            radius = w * 0.17f,
+            center = Offset(w * 0.67f, h * 0.25f),
+        )
+
+        // Flowing energy follows the artwork's diagonal arcs and stays violet/blue/pink.
+        // The curves breathe slowly; broad translucent strokes create a soft light bloom.
+        for (i in 0..2) {
+            val wave = sin(drift * tau + i * 1.15f)
+            val path = Path().apply {
+                when (i) {
+                    0 -> {
+                        moveTo(-w * 0.06f, h * (0.39f + wave * 0.012f))
+                        cubicTo(
+                            w * 0.22f, h * (0.18f + wave * 0.018f),
+                            w * 0.55f, h * (0.70f + wave * 0.015f),
+                            w * 1.06f, h * (0.43f + wave * 0.012f),
+                        )
+                    }
+                    1 -> {
+                        moveTo(-w * 0.08f, h * (0.77f + wave * 0.012f))
+                        cubicTo(
+                            w * 0.24f, h * (0.54f + wave * 0.015f),
+                            w * 0.57f, h * (1.02f + wave * 0.012f),
+                            w * 1.08f, h * (0.72f + wave * 0.012f),
+                        )
+                    }
+                    else -> {
+                        moveTo(w * 0.12f, h * (0.23f + wave * 0.010f))
+                        cubicTo(
+                            w * 0.34f, h * (0.35f + wave * 0.012f),
+                            w * 0.68f, h * (0.12f + wave * 0.010f),
+                            w * 1.04f, h * (0.31f + wave * 0.012f),
+                        )
+                    }
+                }
+            }
+            val ribbonBrush = Brush.linearGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    violet.copy(alpha = 0.82f),
+                    lilac.copy(alpha = 0.92f),
+                    blue.copy(alpha = 0.78f),
+                    pink.copy(alpha = 0.72f),
+                    Color.Transparent,
+                ),
+                start = Offset(0f, h * (0.25f + i * 0.20f)),
+                end = Offset(w, h * (0.58f + i * 0.12f)),
+            )
+            drawPath(path, color = violet.copy(alpha = 0.075f), style = Stroke(width = 19.dp.toPx()))
+            drawPath(path, color = blue.copy(alpha = 0.10f), style = Stroke(width = 8.dp.toPx()))
+            drawPath(path, brush = ribbonBrush, style = Stroke(width = 2.0.dp.toPx()))
+            drawPath(path, color = Color.White.copy(alpha = 0.38f), style = Stroke(width = 0.65.dp.toPx()))
+        }
+
+        // A few glass-like dimensional shards stay near the outer edges, not over the face.
+        for (i in 0 until 10) {
+            val side = if (i % 2 == 0) 0.035f else 0.965f
+            val x = w * (side + sin(drift * tau + i * 0.9f) * 0.012f)
+            val y = h * (((i * 0.173f) + drift * (if (i % 2 == 0) 0.035f else -0.025f) + 1f) % 1f)
+            val rw = (4.5f + (i % 3) * 2.0f) * density
+            val rh = (12f + (i % 4) * 4f) * density
+            val shard = Path().apply {
+                moveTo(x, y - rh)
+                lineTo(x + rw, y)
+                lineTo(x, y + rh)
+                lineTo(x - rw, y)
+                close()
+            }
+            drawPath(shard, color = violet.copy(alpha = 0.07f))
+            drawPath(shard, color = lilac.copy(alpha = 0.42f), style = Stroke(width = 0.8.dp.toPx()))
+        }
+
+        // Fine motes drift at different speeds; selected particles emit a soft local glow.
+        for (i in 0 until 52) {
+            val seed = (i * 0.6180339f) % 1f
+            val x = ((seed + drift * (0.035f + (i % 5) * 0.012f)) % 1f) * w
+            val y = (((i * 0.173f) - drift * (0.075f + (i % 4) * 0.018f) + 1f) % 1f) * h
+            val pulse = (sin(shimmer * tau + i * 1.37f) + 1f) * 0.5f
+            val radius = (0.85f + (i % 3) * 0.55f) * density
+            val point = Offset(x, y)
+            val tint = when (i % 4) {
+                0 -> pink
+                1 -> blue
+                2 -> lilac
+                else -> violet
+            }
+            if (i % 7 == 0) {
+                val glowRadius = radius * 8f
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.34f + pulse * 0.22f),
+                            tint.copy(alpha = 0.20f + pulse * 0.16f),
+                            Color.Transparent,
+                        ),
+                        center = point,
+                        radius = glowRadius,
+                    ),
+                    radius = glowRadius,
+                    center = point,
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.42f + pulse * 0.28f),
+                    start = Offset(x - radius * 3.5f, y),
+                    end = Offset(x + radius * 3.5f, y),
+                    strokeWidth = 0.7.dp.toPx(),
+                )
+            }
+            drawCircle(
+                color = tint.copy(alpha = 0.30f + pulse * 0.52f),
+                radius = radius,
+                center = point,
+            )
+        }
+    }
+}
+""")
+
+print("Installed final cinematic background pass: controlled darkening, character spotlight, animated particles, edge crystals, and curved color-matched light trails.")
